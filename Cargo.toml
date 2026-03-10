@@ -1,0 +1,17 @@
+[package]
+name = "linked-hash-table"
+version = "0.1.0"
+edition = "2024"
+description = "A linked hash table implementation for insert-order iteration and efficient lookups."
+license = "MIT"
+keywords = ["hashmap", "linked", "map", "ordered", "insertion-order"]
+
+repository = "https://github.com/xelis-project/linked-hash-table"
+homepage = "https://github.com/xelis-project/linked-hash-table"
+readme = "README.md"
+
+[dependencies]
+hashbrown = { version = "0.16" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }
