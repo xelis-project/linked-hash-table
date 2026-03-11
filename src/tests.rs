@@ -1337,3 +1337,114 @@ fn test_string_set_elements() {
     let elems: Vec<_> = s.iter().map(|x| x.as_str()).collect();
     assert_eq!(elems, ["beta", "gamma"]);
 }
+
+#[cfg(feature = "serde")]
+mod serde_tests {
+    use super::*;
+
+    #[test]
+    fn test_map_serialize_preserves_insertion_order() {
+        let mut m = LinkedHashMap::new();
+        m.insert_back("c", 3);
+        m.insert_back("a", 1);
+        m.insert_back("b", 2);
+
+        let json = serde_json::to_string(&m).unwrap();
+        // JSON object must reflect insertion order: c, a, b
+        assert_eq!(json, r#"{"c":3,"a":1,"b":2}"#);
+    }
+
+    #[test]
+    fn test_map_deserialize_preserves_source_order() {
+        let json = r#"{"x":10,"y":20,"z":30}"#;
+        let m: LinkedHashMap<String, i32> = serde_json::from_str(json).unwrap();
+
+        let keys: Vec<_> = m.keys().map(|k| k.as_str()).collect();
+        assert_eq!(keys, ["x", "y", "z"]);
+        assert_eq!(m.get("x"), Some(&10));
+        assert_eq!(m.get("y"), Some(&20));
+        assert_eq!(m.get("z"), Some(&30));
+    }
+
+    #[test]
+    fn test_map_round_trip() {
+        let mut original = LinkedHashMap::new();
+        original.insert_back("one", 1_i64);
+        original.insert_back("two", 2_i64);
+        original.insert_back("three", 3_i64);
+
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: LinkedHashMap<String, i64> = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored.len(), 3);
+        let pairs: Vec<_> = restored.iter().map(|(k, v)| (k.as_str(), *v)).collect();
+        assert_eq!(pairs, [("one", 1), ("two", 2), ("three", 3)]);
+    }
+
+    #[test]
+    fn test_map_empty_round_trip() {
+        let original: LinkedHashMap<String, i32> = LinkedHashMap::new();
+        let json = serde_json::to_string(&original).unwrap();
+        assert_eq!(json, "{}");
+        let restored: LinkedHashMap<String, i32> = serde_json::from_str(&json).unwrap();
+        assert!(restored.is_empty());
+    }
+
+    #[test]
+    fn test_set_serialize_preserves_insertion_order() {
+        let mut s = LinkedHashSet::new();
+        s.insert_back("c");
+        s.insert_back("a");
+        s.insert_back("b");
+
+        let json = serde_json::to_string(&s).unwrap();
+        assert_eq!(json, r#"["c","a","b"]"#);
+    }
+
+    #[test]
+    fn test_set_deserialize_preserves_source_order() {
+        let json = r#"[10, 30, 20]"#;
+        let s: LinkedHashSet<i32> = serde_json::from_str(json).unwrap();
+
+        let elems: Vec<_> = s.iter().copied().collect();
+        assert_eq!(elems, [10, 30, 20]);
+    }
+
+    #[test]
+    fn test_set_round_trip() {
+        let mut original: LinkedHashSet<String> = LinkedHashSet::new();
+        original.insert_back(String::from("alpha"));
+        original.insert_back(String::from("beta"));
+        original.insert_back(String::from("gamma"));
+
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: LinkedHashSet<String> = serde_json::from_str(&json).unwrap();
+
+        let elems: Vec<_> = restored.iter().map(|s| s.as_str()).collect();
+        assert_eq!(elems, ["alpha", "beta", "gamma"]);
+    }
+
+    #[test]
+    fn test_set_empty_round_trip() {
+        let original: LinkedHashSet<i32> = LinkedHashSet::new();
+        let json = serde_json::to_string(&original).unwrap();
+        assert_eq!(json, "[]");
+        let restored: LinkedHashSet<i32> = serde_json::from_str(&json).unwrap();
+        assert!(restored.is_empty());
+    }
+
+    #[test]
+    fn test_map_nested_value_round_trip() {
+        let mut m: LinkedHashMap<String, Vec<i32>> = LinkedHashMap::new();
+        m.insert_back(String::from("odds"), vec![1, 3, 5]);
+        m.insert_back(String::from("evens"), vec![2, 4, 6]);
+
+        let json = serde_json::to_string(&m).unwrap();
+        let restored: LinkedHashMap<String, Vec<i32>> = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored.get("odds"), Some(&vec![1, 3, 5]));
+        assert_eq!(restored.get("evens"), Some(&vec![2, 4, 6]));
+        let keys: Vec<_> = restored.keys().map(|k| k.as_str()).collect();
+        assert_eq!(keys, ["odds", "evens"]);
+    }
+}

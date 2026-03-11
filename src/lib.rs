@@ -32,6 +32,8 @@
 pub mod iter;
 mod map;
 pub(crate) mod node;
+#[cfg(feature = "serde")]
+mod serde_impl;
 mod set;
 
 pub use iter::{Drain, IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
