@@ -35,6 +35,21 @@ fn test_insert_alias() {
 }
 
 #[test]
+fn test_insert_alias_existing_key_preserves_position() {
+    let mut m = LinkedHashMap::new();
+    m.insert_back("a", 1);
+    m.insert_back("b", 2);
+    m.insert_back("c", 3);
+
+    let old = m.insert("b", 200);
+    assert_eq!(old, Some(2));
+    assert_eq!(m.get("b"), Some(&200));
+
+    let keys: Vec<_> = m.keys().copied().collect();
+    assert_eq!(keys, vec!["a", "b", "c"]);
+}
+
+#[test]
 fn test_insertion_order_back() {
     let mut m = LinkedHashMap::new();
     for i in 0..10u32 {
@@ -240,6 +255,20 @@ fn test_entry_or_insert() {
     assert_eq!(m.get("b"), Some(&22));
     let keys: Vec<_> = m.keys().copied().collect();
     assert_eq!(keys, vec!["a", "b"]); // new entry inserted at back
+}
+
+#[test]
+fn test_entry_or_insert_existing_key_preserves_position() {
+    let mut m = LinkedHashMap::new();
+    m.insert_back("a", 1);
+    m.insert_back("b", 2);
+    m.insert_back("c", 3);
+
+    *m.entry("b").or_insert(999) += 10;
+    assert_eq!(m.get("b"), Some(&12));
+
+    let keys: Vec<_> = m.keys().copied().collect();
+    assert_eq!(keys, vec!["a", "b", "c"]);
 }
 
 #[test]
@@ -906,6 +935,9 @@ fn test_set_insert_alias() {
     assert!(s.insert(2));
     assert!(!s.insert(1)); // duplicate
     assert_eq!(s.len(), 2);
+
+    let elems: Vec<_> = s.iter().copied().collect();
+    assert_eq!(elems, vec![1, 2]);
 }
 
 #[test]
