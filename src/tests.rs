@@ -1307,7 +1307,22 @@ fn test_box_set_elements() {
         s.insert_back(Box::new(i));
     }
     assert_eq!(s.len(), 50);
-    while let Some(_) = s.pop_front() {}
+
+    let last = s.back().unwrap();
+    {
+        let mut cloned = s.clone();
+        assert_eq!(cloned.len(), 50);
+        cloned.clear();
+
+        assert!(cloned.is_empty());
+        assert!(cloned.front().is_none());
+        assert!(cloned.back().is_none());
+    }
+
+    assert_eq!(**last, 49);
+    assert_eq!(s.len(), 50);
+
+    while s.pop_front().is_some() {}
     assert!(s.is_empty());
 }
 
