@@ -1,6 +1,6 @@
 [package]
 name = "linked-hash-table"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "A linked hash table implementation for insert-order iteration and efficient lookups."
 license = "MIT"

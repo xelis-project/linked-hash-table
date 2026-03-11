@@ -1,6 +1,39 @@
 use super::*;
 
 #[test]
+fn test_send_sync_assertions_for_public_types() {
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    assert_send_sync::<LinkedHashMap<u64, u64>>();
+    assert_send_sync::<LinkedHashSet<u64>>();
+
+    assert_send_sync::<Iter<'static, u64, u64>>();
+    assert_send_sync::<Keys<'static, u64, u64>>();
+    assert_send_sync::<Values<'static, u64, u64>>();
+    assert_send_sync::<IntoIter<u64, u64>>();
+    assert_send_sync::<SetIter<'static, u64>>();
+    assert_send_sync::<SetIntoIter<u64>>();
+
+    // Mutable iterators / drains should be movable across threads but not shared.
+    assert_send::<IterMut<'static, u64, u64>>();
+    assert_send::<ValuesMut<'static, u64, u64>>();
+    assert_send::<Drain<'static, u64, u64>>();
+    assert_send::<SetDrain<'static, u64>>();
+
+    // Entry APIs are views over a mutable map borrow, so they should be Send
+    // but not Sync.
+    assert_send::<Entry<'static, u64, u64>>();
+    assert_send::<OccupiedEntry<'static, u64, u64>>();
+    assert_send::<VacantEntry<'static, u64, u64>>();
+
+    // Keep at least one explicit Sync assertion helper use here so both
+    // bounds are checked by this test function.
+    assert_sync::<LinkedHashMap<u64, u64>>();
+}
+
+#[test]
 fn test_insert_back_and_get() {
     let mut m: LinkedHashMap<&str, i32> = LinkedHashMap::new();
     assert!(m.is_empty());

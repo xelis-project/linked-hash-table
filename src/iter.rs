@@ -39,6 +39,12 @@ pub struct Iter<'a, K, V> {
     pub(crate) _marker: PhantomData<(&'a K, &'a V)>,
 }
 
+// SAFETY: `Iter` only holds raw traversal pointers plus PhantomData tying
+// yielded references to `'a`. Sending/sharing the iterator is safe when
+// both referenced types are `Sync` (required for `&K`/`&V` across threads).
+unsafe impl<K: Sync, V: Sync> Send for Iter<'_, K, V> {}
+unsafe impl<K: Sync, V: Sync> Sync for Iter<'_, K, V> {}
+
 impl<'a, K, V> Iterator for Iter<'a, K, V> {
     type Item = (&'a K, &'a V);
 
@@ -90,6 +96,11 @@ pub struct IterMut<'a, K, V> {
     pub(crate) len: usize,
     pub(crate) _marker: PhantomData<(&'a K, &'a mut V)>,
 }
+
+// SAFETY: `IterMut` is created from `&mut LinkedHashMap`, so it has exclusive
+// iteration state. Moving it to another thread is safe when `K: Sync` (for
+// yielded `&K`) and `V: Send` (for yielded `&mut V`).
+unsafe impl<K: Sync, V: Send> Send for IterMut<'_, K, V> {}
 
 impl<'a, K, V> Iterator for IterMut<'a, K, V> {
     type Item = (&'a K, &'a mut V);
@@ -229,6 +240,11 @@ pub struct Drain<'a, K, V> {
     pub(crate) len: usize,
     pub(crate) _marker: PhantomData<&'a mut (K, V)>,
 }
+
+// SAFETY: `Drain` has unique ownership of all remaining nodes after
+// `LinkedHashMap::drain` clears the table index. Moving it across threads is
+// safe when moved-out elements are `Send`.
+unsafe impl<K: Send, V: Send> Send for Drain<'_, K, V> {}
 
 impl<K, V> Iterator for Drain<'_, K, V> {
     type Item = (K, V);

@@ -71,6 +71,19 @@ pub struct VacantEntry<'a, K, V, S = RandomState> {
     cached_hash: u64,
 }
 
+// SAFETY: Entry views are tied to a unique `&'a mut LinkedHashMap` borrow.
+// Moving them across threads is safe when the borrowed map (and carried key
+// for vacant entries) can be transferred.
+unsafe impl<K: Send, V: Send, S: Send> Send for OccupiedEntry<'_, K, V, S> {}
+unsafe impl<K: Send, V: Send, S: Send> Send for VacantEntry<'_, K, V, S> {}
+unsafe impl<K: Send, V: Send, S: Send> Send for Entry<'_, K, V, S> {}
+
+// SAFETY: Shared references to entry views only permit shared reads unless
+// `&mut self` is held. Sync bounds mirror referenced data/map requirements.
+unsafe impl<K: Sync, V: Sync, S: Sync> Sync for OccupiedEntry<'_, K, V, S> {}
+unsafe impl<K: Sync, V: Sync, S: Sync> Sync for VacantEntry<'_, K, V, S> {}
+unsafe impl<K: Sync, V: Sync, S: Sync> Sync for Entry<'_, K, V, S> {}
+
 impl<'a, K, V, S> Entry<'a, K, V, S>
 where
     K: Hash + Eq,
