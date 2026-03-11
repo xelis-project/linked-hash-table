@@ -29,14 +29,14 @@
 //! [`LinkedHashMap::move_to_back`] / [`LinkedHashMap::move_to_front`] to
 //! explicitly reorder an entry.
 
-pub(crate) mod node;
 pub mod iter;
 mod map;
+pub(crate) mod node;
 mod set;
 
+pub use iter::{Drain, IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
 pub use map::{Entry, LinkedHashMap, OccupiedEntry, VacantEntry};
 pub use set::{LinkedHashSet, SetDrain, SetIntoIter, SetIter};
-pub use iter::{Drain, IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
 
 #[cfg(test)]
 mod tests;

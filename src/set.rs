@@ -16,8 +16,8 @@ use std::borrow::Borrow;
 use std::fmt;
 use std::hash::{BuildHasher, Hash, RandomState};
 
-use crate::iter::{Drain as MapDrain, IntoIter as MapIntoIter, Keys};
 use crate::LinkedHashMap;
+use crate::iter::{Drain as MapDrain, IntoIter as MapIntoIter, Keys};
 
 /// A hash set that preserves **insertion order** and exposes a
 /// [`VecDeque`]-like API with [`insert_back`], [`insert_front`],
@@ -60,24 +60,32 @@ pub struct LinkedHashSet<T, S = RandomState> {
 impl<T> LinkedHashSet<T> {
     /// Creates an empty `LinkedHashSet`.
     pub fn new() -> Self {
-        Self { map: LinkedHashMap::new() }
+        Self {
+            map: LinkedHashMap::new(),
+        }
     }
 
     /// Creates an empty `LinkedHashSet` with the specified initial capacity.
     pub fn with_capacity(capacity: usize) -> Self {
-        Self { map: LinkedHashMap::with_capacity(capacity) }
+        Self {
+            map: LinkedHashMap::with_capacity(capacity),
+        }
     }
 }
 
 impl<T, S> LinkedHashSet<T, S> {
     /// Creates an empty `LinkedHashSet` using the supplied hasher builder.
     pub fn with_hasher(hash_builder: S) -> Self {
-        Self { map: LinkedHashMap::with_hasher(hash_builder) }
+        Self {
+            map: LinkedHashMap::with_hasher(hash_builder),
+        }
     }
 
     /// Creates an empty `LinkedHashSet` with the given capacity and hasher.
     pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
-        Self { map: LinkedHashMap::with_capacity_and_hasher(capacity, hash_builder) }
+        Self {
+            map: LinkedHashMap::with_capacity_and_hasher(capacity, hash_builder),
+        }
     }
 
     /// Returns the number of elements in the set.
@@ -234,7 +242,9 @@ where
     /// iterator.  The set is empty after this call (even if the iterator is
     /// dropped before it is fully consumed).
     pub fn drain(&mut self) -> SetDrain<'_, T> {
-        SetDrain { inner: self.map.drain() }
+        SetDrain {
+            inner: self.map.drain(),
+        }
     }
 
     /// Returns `true` if every element of `self` is also contained in `other`.
@@ -260,7 +270,9 @@ where
 impl<T, S> LinkedHashSet<T, S> {
     /// Returns an iterator over elements in **insertion order**.
     pub fn iter<'a>(&'a self) -> SetIter<'a, T> {
-        SetIter { inner: self.map.keys() }
+        SetIter {
+            inner: self.map.keys(),
+        }
     }
 }
 
@@ -291,8 +303,7 @@ impl<T: PartialEq + Eq, S> Eq for LinkedHashSet<T, S> {}
 
 impl<T: Clone + Hash + Eq, S: BuildHasher + Clone> Clone for LinkedHashSet<T, S> {
     fn clone(&self) -> Self {
-        let mut new_set =
-            Self::with_capacity_and_hasher(self.len(), self.map.hasher().clone());
+        let mut new_set = Self::with_capacity_and_hasher(self.len(), self.map.hasher().clone());
         for v in self.iter() {
             new_set.insert_back(v.clone());
         }
@@ -326,7 +337,9 @@ impl<T, S> IntoIterator for LinkedHashSet<T, S> {
     type IntoIter = SetIntoIter<T>;
 
     fn into_iter(self) -> SetIntoIter<T> {
-        SetIntoIter { inner: self.map.into_iter() }
+        SetIntoIter {
+            inner: self.map.into_iter(),
+        }
     }
 }
 
@@ -424,9 +437,7 @@ impl<T> ExactSizeIterator for SetIntoIter<T> {}
 #[cfg(not(coverage))]
 const _: () = {
     /// `SetIter<'long, T>` is covariant in `'a` and `T`.
-    fn _check_set_iter<'long: 'short, 'short, T>(
-        x: SetIter<'long, T>,
-    ) -> SetIter<'short, T> {
+    fn _check_set_iter<'long: 'short, 'short, T>(x: SetIter<'long, T>) -> SetIter<'short, T> {
         x
     }
 };

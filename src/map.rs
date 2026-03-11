@@ -15,16 +15,12 @@ use crate::node::Node;
 
 /// Computes the hash of `key` using the supplied `hash_builder`.
 #[inline]
-fn make_hash<K, Q, S>(hash_builder: &S, key: &Q) -> u64
+fn make_hash<Q, S>(hash_builder: &S, key: &Q) -> u64
 where
-    K: Borrow<Q>,
     Q: Hash + ?Sized,
     S: BuildHasher,
 {
-    use std::hash::Hasher;
-    let mut state = hash_builder.build_hasher();
-    key.hash(&mut state);
-    state.finish()
+    hash_builder.hash_one(key)
 }
 
 /// A hash map that preserves **insertion order** and exposes a
@@ -180,7 +176,7 @@ where
         let node = self.node_ptr.as_ptr();
         // SAFETY: `node` is live and belongs to `map`.
         unsafe {
-            let hash = make_hash::<K, K, S>(&map.hash_builder, Node::key_ref(node));
+            let hash = make_hash(&map.hash_builder, Node::key_ref(node));
             let bucket = map
                 .table
                 .find_entry(hash, |ptr| std::ptr::eq(ptr.as_ptr(), node))
@@ -223,7 +219,7 @@ where
         let hash_builder = &map.hash_builder;
         map.table.insert_unique(hash, node_ptr, |ptr| {
             let k = unsafe { Node::key_ref(ptr.as_ptr()) };
-            make_hash::<K, K, S>(hash_builder, k)
+            make_hash(hash_builder, k)
         });
         // SAFETY: node was just inserted and remains live in the map.
         unsafe { Node::value_mut(node_ptr.as_ptr()) }
@@ -357,7 +353,7 @@ where
     /// Gets the given key's corresponding entry in the map for in-place
     /// manipulation.
     pub fn entry<'a>(&'a mut self, key: K) -> Entry<'a, K, V, S> {
-        let hash = make_hash::<K, K, S>(&self.hash_builder, &key);
+        let hash = make_hash(&self.hash_builder, &key);
         if let Some(&node_ptr) = self
             .table
             .find(hash, |ptr| unsafe { Node::key_ref(ptr.as_ptr()) == &key })
@@ -367,7 +363,11 @@ where
                 node_ptr,
             })
         } else {
-            Entry::Vacant(VacantEntry { map: self, key, cached_hash: hash })
+            Entry::Vacant(VacantEntry {
+                map: self,
+                key,
+                cached_hash: hash,
+            })
         }
     }
 
@@ -382,13 +382,12 @@ where
     ///
     /// [`move_to_back`]: LinkedHashMap::move_to_back
     pub fn insert_back(&mut self, key: K, value: V) -> Option<V> {
-        let hash = make_hash::<K, K, S>(&self.hash_builder, &key);
+        let hash = make_hash(&self.hash_builder, &key);
 
         // Check whether the key is already present.
-        if let Some(node_ptr) = self.table
-            .find(hash, |ptr| unsafe {
-                Node::key_ref(ptr.as_ptr()) == &key
-            })
+        if let Some(node_ptr) = self
+            .table
+            .find(hash, |ptr| unsafe { Node::key_ref(ptr.as_ptr()) == &key })
             .copied()
         {
             // Key already present: update value in-place, preserve position.
@@ -397,10 +396,7 @@ where
             // SAFETY: node_ptr is a live node; &mut self ensures no other
             // reference to its value exists simultaneously.
             unsafe {
-                let old = std::mem::replace(
-                    Node::value_mut(node_ptr.as_ptr()),
-                    value,
-                );
+                let old = std::mem::replace(Node::value_mut(node_ptr.as_ptr()), value);
                 return Some(old);
             }
         }
@@ -418,7 +414,7 @@ where
         let hash_builder = &self.hash_builder;
         self.table.insert_unique(hash, node_ptr, |ptr| {
             let k = unsafe { Node::key_ref(ptr.as_ptr()) };
-            make_hash::<K, K, S>(hash_builder, k)
+            make_hash(hash_builder, k)
         });
         None
     }
@@ -434,30 +430,28 @@ where
     ///
     /// [`move_to_front`]: LinkedHashMap::move_to_front
     pub fn insert_front(&mut self, key: K, value: V) -> Option<V> {
-        let hash = make_hash::<K, K, S>(&self.hash_builder, &key);
+        let hash = make_hash(&self.hash_builder, &key);
 
-        if let Some(node_ptr) = self.table
-            .find(hash, |ptr| unsafe {
-                Node::key_ref(ptr.as_ptr()) == &key
-            })
+        if let Some(node_ptr) = self
+            .table
+            .find(hash, |ptr| unsafe { Node::key_ref(ptr.as_ptr()) == &key })
             .copied()
         {
             // Key already present: update in-place, preserve position.
             unsafe {
-                let old = std::mem::replace(
-                    Node::value_mut(node_ptr.as_ptr()),
-                    value,
-                );
+                let old = std::mem::replace(Node::value_mut(node_ptr.as_ptr()), value);
                 return Some(old);
             }
         }
 
         let node_ptr = Node::new(key, value);
-        unsafe { Self::link_after(self.head.as_ptr(), node_ptr.as_ptr()); }
+        unsafe {
+            Self::link_after(self.head.as_ptr(), node_ptr.as_ptr());
+        }
         let hash_builder = &self.hash_builder;
         self.table.insert_unique(hash, node_ptr, |ptr| {
             let k = unsafe { Node::key_ref(ptr.as_ptr()) };
-            make_hash::<K, K, S>(hash_builder, k)
+            make_hash(hash_builder, k)
         });
         None
     }
@@ -477,7 +471,7 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let hash = make_hash::<K, Q, S>(&self.hash_builder, key);
+        let hash = make_hash(&self.hash_builder, key);
         self.table
             .find(hash, |ptr| unsafe {
                 Node::key_ref(ptr.as_ptr()).borrow() == key
@@ -492,10 +486,11 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let hash = make_hash::<K, Q, S>(&self.hash_builder, key);
+        let hash = make_hash(&self.hash_builder, key);
         // Obtain a copy of the node pointer (table.get takes &self.table);
         // then use &mut self to justify the exclusive &mut V.
-        let ptr = self.table
+        let ptr = self
+            .table
             .find(hash, |ptr| unsafe {
                 Node::key_ref(ptr.as_ptr()).borrow() == key
             })
@@ -510,7 +505,7 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let hash = make_hash::<K, Q, S>(&self.hash_builder, key);
+        let hash = make_hash(&self.hash_builder, key);
         self.table
             .find(hash, |ptr| unsafe {
                 Node::key_ref(ptr.as_ptr()).borrow() == key
@@ -528,7 +523,7 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let hash = make_hash::<K, Q, S>(&self.hash_builder, key);
+        let hash = make_hash(&self.hash_builder, key);
         self.table
             .find(hash, |ptr| unsafe {
                 Node::key_ref(ptr.as_ptr()).borrow() == key
@@ -547,7 +542,6 @@ where
                 return None;
             }
             Some((Node::key_ref(first), Node::value_ref(first)))
-            
         }
     }
 
@@ -628,10 +622,13 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let hash = make_hash::<K, Q, S>(&self.hash_builder, key);
-        let bucket = self.table.find_entry(hash, |ptr| unsafe {
-            Node::key_ref(ptr.as_ptr()).borrow() == key
-        }).ok()?;
+        let hash = make_hash(&self.hash_builder, key);
+        let bucket = self
+            .table
+            .find_entry(hash, |ptr| unsafe {
+                Node::key_ref(ptr.as_ptr()).borrow() == key
+            })
+            .ok()?;
         let (node_ptr, _) = bucket.remove();
         unsafe {
             let node = node_ptr.as_ptr();
@@ -656,8 +653,7 @@ where
     unsafe fn remove_node(&mut self, node: *mut Node<K, V>) -> Option<(K, V)> {
         unsafe {
             // Compute the hash from the node's own key.
-            let hash =
-                make_hash::<K, K, S>(&self.hash_builder, Node::key_ref(node));
+            let hash = make_hash(&self.hash_builder, Node::key_ref(node));
             // Locate the bucket by pointer identity — faster than key equality
             // and sidesteps any lifetime issue with borrowing the key field.
             let bucket = self
@@ -691,11 +687,13 @@ where
                 let v = Node::value_mut(cur);
                 if !f(k, v) {
                     // Compute hash while k is still valid, then find by pointer.
-                    let hash = make_hash::<K, K, S>(&self.hash_builder, k);
+                    let hash = make_hash(&self.hash_builder, k);
                     let b = self
                         .table
                         .find_entry(hash, |ptr| std::ptr::eq(ptr.as_ptr(), cur))
-                        .expect("LinkedHashMap invariant violated: retained node missing from table");
+                        .expect(
+                            "LinkedHashMap invariant violated: retained node missing from table",
+                        );
                     b.remove();
                     Self::unlink(cur);
                     Node::key_drop(cur);
@@ -734,7 +732,7 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let hash = make_hash::<K, Q, S>(&self.hash_builder, key);
+        let hash = make_hash(&self.hash_builder, key);
         if let Some(&node_ptr) = self.table.find(hash, |ptr| unsafe {
             Node::key_ref(ptr.as_ptr()).borrow() == key
         }) {
@@ -758,7 +756,7 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let hash = make_hash::<K, Q, S>(&self.hash_builder, key);
+        let hash = make_hash(&self.hash_builder, key);
         if let Some(&node_ptr) = self.table.find(hash, |ptr| unsafe {
             Node::key_ref(ptr.as_ptr()).borrow() == key
         }) {
@@ -837,7 +835,9 @@ impl<K, V, S> LinkedHashMap<K, V, S> {
 
     /// Returns a mutable iterator over **values** in insertion order.
     pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
-        ValuesMut { inner: self.iter_mut() }
+        ValuesMut {
+            inner: self.iter_mut(),
+        }
     }
 }
 
@@ -933,8 +933,7 @@ impl<K: PartialEq + Eq, V: Eq, S> Eq for LinkedHashMap<K, V, S> {}
 
 impl<K: Clone + Hash + Eq, V: Clone, S: BuildHasher + Clone> Clone for LinkedHashMap<K, V, S> {
     fn clone(&self) -> Self {
-        let mut new_map =
-            Self::with_capacity_and_hasher(self.len(), self.hash_builder.clone());
+        let mut new_map = Self::with_capacity_and_hasher(self.len(), self.hash_builder.clone());
         for (k, v) in self.iter() {
             new_map.insert_back(k.clone(), v.clone());
         }
@@ -984,7 +983,12 @@ impl<K, V, S> IntoIterator for LinkedHashMap<K, V, S> {
         std::mem::forget(self);
         drop(table);
         drop(hash_builder);
-        IntoIter { front, tail, head, len }
+        IntoIter {
+            front,
+            tail,
+            head,
+            len,
+        }
     }
 }
 

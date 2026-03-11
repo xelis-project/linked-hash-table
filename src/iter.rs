@@ -374,9 +374,7 @@ const _: () = {
     }
 
     /// `Values<'long, K, V>` is covariant in `'a` and `V`.
-    fn _check_values<'long: 'short, 'short, K, V>(
-        x: Values<'long, K, V>,
-    ) -> Values<'short, K, V> {
+    fn _check_values<'long: 'short, 'short, K, V>(x: Values<'long, K, V>) -> Values<'short, K, V> {
         x
     }
 

@@ -447,7 +447,10 @@ fn test_string_borrowed_lookup_paths() {
     m.insert_back("hello".to_string(), 1);
     assert!(m.contains_key("hello"));
     assert_eq!(m.get("hello"), Some(&1));
-    assert_eq!(m.get_key_value("hello").map(|(k, v)| (k.as_str(), *v)), Some(("hello", 1)));
+    assert_eq!(
+        m.get_key_value("hello").map(|(k, v)| (k.as_str(), *v)),
+        Some(("hello", 1))
+    );
     assert_eq!(m.remove("hello"), Some(1));
     assert!(m.is_empty());
 }
@@ -546,9 +549,9 @@ fn test_iter_mut_next_back_and_size_hint() {
     assert_eq!(it.next_back().map(|(k, v)| (*k, *v)), Some((3, 30)));
     assert_eq!(it.size_hint(), (2, Some(2)));
 
-        let mut empty = LinkedHashMap::<i32, i32>::new();
-        let mut it2 = empty.iter_mut();
-        assert_eq!(it2.next_back(), None);
+    let mut empty = LinkedHashMap::<i32, i32>::new();
+    let mut it2 = empty.iter_mut();
+    assert_eq!(it2.next_back(), None);
 }
 
 #[test]
@@ -595,70 +598,70 @@ fn test_drain() {
     assert!(m.is_empty());
 }
 
+#[test]
+fn test_into_iterator_for_refs() {
+    let mut m = LinkedHashMap::new();
+    m.insert_back(1, 10);
+    m.insert_back(2, 20);
 
-    #[test]
-    fn test_into_iterator_for_refs() {
-        let mut m = LinkedHashMap::new();
-        m.insert_back(1, 10);
-        m.insert_back(2, 20);
+    let from_ref: Vec<_> = (&m).into_iter().map(|(k, v)| (*k, *v)).collect();
+    assert_eq!(from_ref, vec![(1, 10), (2, 20)]);
 
-        let from_ref: Vec<_> = (&m).into_iter().map(|(k, v)| (*k, *v)).collect();
-        assert_eq!(from_ref, vec![(1, 10), (2, 20)]);
-
-        for (_, v) in &mut m {
-            *v += 1;
-        }
-        assert_eq!(m.get(&1), Some(&11));
-        assert_eq!(m.get(&2), Some(&21));
+    for (_, v) in &mut m {
+        *v += 1;
     }
+    assert_eq!(m.get(&1), Some(&11));
+    assert_eq!(m.get(&2), Some(&21));
+}
 
-    #[test]
-    fn test_default_map_and_set() {
-        let mut m: LinkedHashMap<i32, i32> = Default::default();
-        assert!(m.is_empty());
-        m.insert_back(1, 2);
-        assert_eq!(m.get(&1), Some(&2));
+#[test]
+fn test_default_map_and_set() {
+    let mut m: LinkedHashMap<i32, i32> = Default::default();
+    assert!(m.is_empty());
+    m.insert_back(1, 2);
+    assert_eq!(m.get(&1), Some(&2));
 
-        let mut s: LinkedHashSet<i32> = Default::default();
-        assert!(s.is_empty());
-        s.insert_back(7);
-        assert!(s.contains(&7));
+    let mut s: LinkedHashSet<i32> = Default::default();
+    assert!(s.is_empty());
+    s.insert_back(7);
+    assert!(s.contains(&7));
+}
+
+#[test]
+fn test_partial_eq_len_mismatch_map_set() {
+    let mut a = LinkedHashMap::new();
+    a.insert_back(1, 1);
+    let mut b = LinkedHashMap::new();
+    b.insert_back(1, 1);
+    b.insert_back(2, 2);
+    assert_ne!(a, b);
+
+    let mut sa = LinkedHashSet::new();
+    sa.insert_back(1);
+    let mut sb = LinkedHashSet::new();
+    sb.insert_back(1);
+    sb.insert_back(2);
+    assert_ne!(sa, sb);
+}
+
+#[test]
+fn test_entry_vacant_insert_rehash_path() {
+    // Stress the vacant-entry insertion path so HashTable rehashing is likely
+    // to occur and the rehash closure is exercised.
+    let mut m: LinkedHashMap<i32, i32> = LinkedHashMap::with_capacity(1);
+    for i in 0..256 {
+        *m.entry(i).or_insert(i * 10) += 1;
     }
-
-    #[test]
-    fn test_partial_eq_len_mismatch_map_set() {
-        let mut a = LinkedHashMap::new();
-        a.insert_back(1, 1);
-        let mut b = LinkedHashMap::new();
-        b.insert_back(1, 1);
-        b.insert_back(2, 2);
-        assert_ne!(a, b);
-
-        let mut sa = LinkedHashSet::new();
-        sa.insert_back(1);
-        let mut sb = LinkedHashSet::new();
-        sb.insert_back(1);
-        sb.insert_back(2);
-        assert_ne!(sa, sb);
+    // Second pass over the same keys exercises the occupied-entry branch of
+    // the same or_insert monomorphization.
+    for i in 0..256 {
+        *m.entry(i).or_insert(i * 10) += 1;
     }
+    assert_eq!(m.len(), 256);
+    assert_eq!(m.get(&0), Some(&2));
+    assert_eq!(m.get(&255), Some(&(2550 + 2)));
+}
 
-    #[test]
-    fn test_entry_vacant_insert_rehash_path() {
-        // Stress the vacant-entry insertion path so HashTable rehashing is likely
-        // to occur and the rehash closure is exercised.
-        let mut m: LinkedHashMap<i32, i32> = LinkedHashMap::with_capacity(1);
-        for i in 0..256 {
-            *m.entry(i).or_insert(i * 10) += 1;
-        }
-        // Second pass over the same keys exercises the occupied-entry branch of
-        // the same or_insert monomorphization.
-        for i in 0..256 {
-            *m.entry(i).or_insert(i * 10) += 1;
-        }
-        assert_eq!(m.len(), 256);
-        assert_eq!(m.get(&0), Some(&2));
-        assert_eq!(m.get(&255), Some(&(2550 + 2)));
-    }
 #[test]
 fn test_drain_partial() {
     let mut m = LinkedHashMap::new();
@@ -847,8 +850,8 @@ fn test_get_key_value() {
 fn test_mixed_insert_front_back_ordering() {
     let mut m = LinkedHashMap::new();
     m.insert_back("b", 2);
-    m.insert_front("a", 1);  // a, b
-    m.insert_back("c", 3);   // a, b, c
+    m.insert_front("a", 1); // a, b
+    m.insert_back("c", 3); // a, b, c
     m.insert_front("z", 26); // z, a, b, c
     let keys: Vec<_> = m.keys().copied().collect();
     assert_eq!(keys, vec!["z", "a", "b", "c"]);
@@ -1242,7 +1245,7 @@ fn test_set_mixed_front_back() {
     let mut s = LinkedHashSet::new();
     s.insert_back("b");
     s.insert_front("a"); // a, b
-    s.insert_back("c");  // a, b, c
+    s.insert_back("c"); // a, b, c
     s.insert_front("z"); // z, a, b, c
     let elems: Vec<_> = s.iter().copied().collect();
     assert_eq!(elems, vec!["z", "a", "b", "c"]);
